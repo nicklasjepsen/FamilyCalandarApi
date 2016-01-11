@@ -8,8 +8,9 @@ namespace SystemOut.CalandarApi.Controllers
     public class CalendarController : ApiController
     {
         [HttpGet]
-        public CalendarModel Get(string email)
+        public CalendarModel Get(string id)
         {
+            var credentialProvider = new CredentialProviderMock();
             var ewsService = new ExchangeService
             {
                 // TODO: Set value
