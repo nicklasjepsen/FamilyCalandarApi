@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Web.Http;
 using Microsoft.Exchange.WebServices.Data;
 
@@ -10,19 +13,23 @@ namespace SystemOut.CalandarApi.Controllers
         [HttpGet]
         public CalendarModel Get(string id)
         {
-            var credentialProvider = new CredentialProviderMock();
+            // TODO: Implement your own credential provider
+            //var credentialProvider = new CredentialProviderMock();
+            var credentialProvider = new CredentialProvider();
+            var credentials = credentialProvider.GetCredentials(id);
+            if (credentials == null)
+                throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.NotFound, ""));
             var ewsService = new ExchangeService
             {
-                // TODO: Set value
-                //Credentials = new WebCredentials("user", "pass", "domain"),
-                //Url = new Uri("ews url")
+                Credentials = new WebCredentials(credentials.Username, credentials.Password, credentials.Domain),
+                Url = new Uri(credentials.ServiceUrl)
             };
             var week = ewsService.FindAppointments(WellKnownFolderName.Calendar,
                 new CalendarView(DateTime.Today, DateTime.Today.AddDays(7)));
 
             return new CalendarModel
             {
-                Owner = email,
+                Owner = id,
                 Appointments = week.Select(a => new AppointmentModel
                 {
                     Subject = a.Subject,
