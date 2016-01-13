@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.Exchange.WebServices.Data;
+using SystemOut.Toolbox;
 
 namespace SystemOut.CalandarApi.Controllers
 {
@@ -164,7 +165,7 @@ namespace SystemOut.CalandarApi.Controllers
                                 if (splitted.Length > 1)
                                 {
                                     var tzStr = splitted[1];
-                                    var tz = 
+                                    var tz = Converter.
 
                                 }
                             }
