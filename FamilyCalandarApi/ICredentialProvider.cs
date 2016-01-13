@@ -1,7 +1,7 @@
 namespace SystemOut.CalandarApi
 {
-    interface ICredentialProvider
+    public interface ICredentialProvider
     {
-        CalendarCredentials GetCredentials(string id);
+        CalendarCredential GetCredentials(string id);
     }
 }

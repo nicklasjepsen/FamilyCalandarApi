@@ -125,14 +125,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Start\WebApiConfig.cs" />
-    <Compile Include="CalendarCredentials.cs" />
     <Compile Include="Controllers\CalendarController.cs" />
     <Compile Include="CredentialProvider.cs" />
-    <Compile Include="CredentialProviderMock.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
     <Compile Include="ICredentialProvider.cs" />
+    <Compile Include="IcsService.cs" />
+    <Compile Include="IIcsService.cs" />
     <Compile Include="Models\AppointmentModel.cs" />
     <Compile Include="Models\CalendarModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
