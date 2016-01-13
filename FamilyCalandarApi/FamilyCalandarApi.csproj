@@ -184,6 +184,12 @@
   <ItemGroup>
     <WCFMetadata Include="Service References\" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Submodules\SystemOutToolbox\SystemOut.Toolbox.Core\SystemOut.Toolbox.Core.csproj">
+      <Project>{2f3586e1-8d01-4608-adbf-7fdabae2c305}</Project>
+      <Name>SystemOut.Toolbox.Core</Name>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
