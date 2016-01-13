@@ -11,7 +11,10 @@ namespace SystemOut.CalandarApi
     {
         public string[] GetIcsContent(string path)
         {
-            var wc = new WebClient();
+            var wc = new WebClient
+            {
+                Encoding = Encoding.UTF8
+            };
             var data = wc.DownloadString(path);
             return data.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
         }

@@ -83,6 +83,56 @@ namespace SystemOut.CalandarApi.Controllers
             }
         }
 
+        // OData support follows
+        //[EnableQuery]
+        //[HttpGet]
+        //public IQueryable<AppointmentModel> Get(string id)
+        //{
+        //    try
+        //    {
+        //        // TODO: Implement your own credential provider
+        //        var credentials = credentialProvider.GetCredentials(id);
+        //        if (credentials == null)
+        //            throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.NotFound, ""));
+
+        //        switch (credentials.Type)
+        //        {
+        //            case "EWS":
+        //                var ewsService = new ExchangeService
+        //                {
+        //                    Credentials = new WebCredentials(credentials.Username, credentials.Password, credentials.Domain),
+        //                    Url = new Uri(credentials.ServiceUrl)
+        //                };
+        //                var week = ewsService.FindAppointments(WellKnownFolderName.Calendar,
+        //                    new CalendarView(DateTime.Today.AddDays(-30), DateTime.Today.AddDays(90)));
+
+        //                return week.Select(a => new AppointmentModel
+        //                {
+        //                    Subject = a.Subject,
+        //                    StartTime = a.Start.ToUniversalTime(),
+        //                    EndTime = a.End.ToUniversalTime(),
+        //                    Duration = a.Duration,
+        //                    IsPrivate = a.Sensitivity == Sensitivity.Private || a.Sensitivity == Sensitivity.Confidential
+        //                }).AsQueryable();
+        //            case "ICS":
+        //                var icsCal = GetIcsCalendar(credentials.ServiceUrl);
+        //                return icsCal.Where(a => a != null && a.StartDate.Date >= DateTime.UtcNow.Date && a.EndDate < DateTime.UtcNow.Date.AddDays(8))
+        //                    .Select(e => new AppointmentModel
+        //                    {
+        //                        Subject = e.Summary,
+        //                        StartTime = e.StartDate,
+        //                        EndTime = e.EndDate,
+        //                    }).AsQueryable();
+        //            default: throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.BadRequest, ""));
+        //        }
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.InternalServerError, e.Message));
+        //    }
+        //}
+
+
         private IEnumerable<VEvent> GetIcsCalendar(string url)
         {
             var allLines = icsService.GetIcsContent(url);
@@ -104,7 +154,22 @@ namespace SystemOut.CalandarApi.Controllers
                         var value = line.Substring(splitterIndex + 1, line.Length - splitterIndex - 1);
                         if (props.ContainsKey(key))
                             continue;
+                        else
+                        {
+                            if (key.Contains("DTSTART;TZID="))
+                            {
+                                // Handle timezone different
+                                // First get timezone
+                                var splitted = key.Split('=');
+                                if (splitted.Length > 1)
+                                {
+                                    var tzStr = splitted[1];
+                                    var tz = 
+
+                                }
+                            }
                         props.Add(key, value);
+                        }
                     } while (allLines[y] != "END:VEVENT");
                     var vevent = new VEvent();
                     string created, summary, startTime, endTime, sequence, uid;
@@ -118,6 +183,7 @@ namespace SystemOut.CalandarApi.Controllers
                         vevent.Summary = summary;
                     }
                     // TODO: Handle timezone
+                    if (props.TryGetValue())
                     if (props.TryGetValue("DTSTART;TZID=Europe/Copenhagen", out startTime))
                     {
                         vevent.StartDate = DateTime.ParseExact(startTime, "yyyyMMddTHHmmss", CultureInfo.InvariantCulture);
