@@ -31,11 +31,12 @@ namespace SystemOut.CalandarApi.Controllers
         }
 
         [HttpGet]
-        public CalendarModel Get(string id)
+        public CalendarModel Get(string id, int days)
         {
             var credentials = credentialProvider.GetCredentials(id);
             if (credentials == null)
                 throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.NotFound, ""));
+
 
             switch (credentials.Type)
             {
@@ -46,7 +47,7 @@ namespace SystemOut.CalandarApi.Controllers
                         Url = new Uri(credentials.ServiceUrl)
                     };
                     var week = ewsService.FindAppointments(WellKnownFolderName.Calendar,
-                        new CalendarView(DateTime.Today, DateTime.Today.AddDays(7)));
+                        new CalendarView(DateTime.Today, DateTime.Today.AddDays(days)));
 
                     return new CalendarModel
                     {
@@ -70,7 +71,7 @@ namespace SystemOut.CalandarApi.Controllers
                             icsCal.Where(
                                 a =>
                                     a != null && a.StartDate.Date >= DateTime.UtcNow.Date &&
-                                    a.EndDate < DateTime.UtcNow.Date.AddDays(8))
+                                    a.EndDate <= DateTime.UtcNow.Date.AddDays(days))
                                 .Select(e => new AppointmentModel
                                 {
                                     Subject = e.Summary,
