@@ -1,4 +1,5 @@
 ﻿using System.Web.Http;
+using Microsoft.Practices.Unity;
 
 namespace SystemOut.CalandarApi
 {
@@ -7,7 +8,11 @@ namespace SystemOut.CalandarApi
         public static void Register(HttpConfiguration config)
         {
             // Web API configuration and services
-            
+            var container = new UnityContainer();
+            container.RegisterType<ICalendarCache, CalendarCache>(new ContainerControlledLifetimeManager());
+            container.RegisterType<ICredentialProvider, CredentialProvider>(new HierarchicalLifetimeManager());
+            container.RegisterType<IIcsService, IcsService>(new HierarchicalLifetimeManager());
+            config.DependencyResolver = new UnityResolver(container);
             // Web API routes
             config.MapHttpAttributeRoutes();
 

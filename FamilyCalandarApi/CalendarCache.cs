@@ -9,49 +9,57 @@ namespace SystemOut.CalandarApi
 {
     public interface ICalendarCache
     {
-        CalendarCacheEntry GetCalendar(Guid watermark);
-        CalendarCacheEntry PutCalendar(CalendarModel calendarModel);
+        CalendarCacheEntry GetCalendar(string id);
+        CalendarCacheEntry PutCalendar(string id, CalendarModel calendarModel);
     }
 
     internal class CalendarCache : ICalendarCache
     {
-        private readonly ConcurrentDictionary<Guid, InternalCalendarCacheEntry> cache;
+        private readonly ConcurrentDictionary<string, InternalCalendarCacheEntry> cache;
 
         public CalendarCache()
         {
-            cache = new ConcurrentDictionary<Guid, InternalCalendarCacheEntry>();
+            cache = new ConcurrentDictionary<string, InternalCalendarCacheEntry>();
         }
 
-        public CalendarCacheEntry GetCalendar(Guid watermark)
+        public CalendarCacheEntry GetCalendar(string id)
         {
             InternalCalendarCacheEntry cachedEntry;
-            if (cache.TryGetValue(watermark, out cachedEntry))
+            if (cache.TryGetValue(id, out cachedEntry))
             {
-                if (!cachedEntry.IsExpired)
+                if (cachedEntry.IsExpired)
+                    cache.TryRemove(id, out cachedEntry);
+                else
                     return new CalendarCacheEntry(cachedEntry);
             }
 
             return null;
         }
 
-        public CalendarCacheEntry PutCalendar(CalendarModel calendarModel)
+        public CalendarCacheEntry PutCalendar(string id, CalendarModel calendarModel)
         {
             var cacheEntry = new InternalCalendarCacheEntry
             {
                 CalendarModel = calendarModel,
                 //ExpirationTime = DateTime.UtcNow.AddMinutes(5),
-                ExpirationTime = DateTime.UtcNow.AddSeconds(10),
+                ExpirationTime = DateTime.UtcNow.AddSeconds(20),
             };
-            var guid = Guid.NewGuid();
-            var internalCacheEntry = cache.AddOrUpdate(guid, cacheEntry, (guid1, entry) => cacheEntry);
+            var internalCacheEntry = cache.AddOrUpdate(id, cacheEntry, (id1, entry) =>
+            {
+                // No changes (at least in number of appointments :))
+                if (entry.CalendarModel.Appointments.Count() != cacheEntry.CalendarModel.Appointments.Count())
+                    cacheEntry.CalendarModel.LastChangeDate = DateTime.UtcNow;
+                    
+                return cacheEntry;
+            });
 
-            return new CalendarCacheEntry(internalCacheEntry);
+            return new CalendarCacheEntry(internalCacheEntry) { Id = id };
         }
     }
 
     public class CalendarCacheEntry : BaseCalendarCacheEntry
     {
-        public Guid Watermark { get; set; }
+        public string Id { get; set; }
 
         public CalendarCacheEntry(BaseCalendarCacheEntry internalCalendarCacheEntry)
         {
@@ -67,6 +75,6 @@ namespace SystemOut.CalandarApi
     {
         public CalendarModel CalendarModel { get; set; }
         public DateTime ExpirationTime { get; set; }
-        public bool IsExpired => ExpirationTime >= DateTime.UtcNow;
+        public bool IsExpired => ExpirationTime <= DateTime.UtcNow;
     }
 }

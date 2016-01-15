@@ -5,7 +5,7 @@ namespace SystemOut.CalandarApi
 {
     public class CalendarModel
     {
-        public Guid Watermark { get; set; }
+        public DateTime LastChangeDate { get; set; }
         public string Owner { get; set; }
 
         public IEnumerable<AppointmentModel> Appointments { get; set; }

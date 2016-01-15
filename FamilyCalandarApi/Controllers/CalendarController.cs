@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -19,12 +20,12 @@ namespace SystemOut.CalandarApi.Controllers
         private readonly IIcsService icsService;
         private readonly ICalendarCache calendarCache;
 
-        public CalendarController()
-        {
-            credentialProvider = new CredentialProvider();
-            icsService = new IcsService();
-            calendarCache = new CalendarCache();
-        }
+        //public CalendarController()
+        //{
+        //    credentialProvider = new CredentialProvider();
+        //    icsService = new IcsService();
+        //    calendarCache = new CalendarCache();
+        //}
 
         public CalendarController(ICredentialProvider credentialProvider, IIcsService icsService, ICalendarCache calendarCache)
         {
@@ -34,21 +35,29 @@ namespace SystemOut.CalandarApi.Controllers
         }
 
         [HttpGet]
-        public CalendarModel Get(string id, Guid watermark, int days)
+        public CalendarModel Get(string id, int days)
         {
             var credentials = credentialProvider.GetCredentials(id);
             if (credentials == null)
                 throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.NotFound, ""));
 
-            var cachedCalendar = calendarCache.GetCalendar(watermark);
+            var cachedCalendar = calendarCache.GetCalendar(id);
+            CalendarModel calendarModel = null;
             if (cachedCalendar != null)
             {
                 if (!cachedCalendar.IsExpired)
                     // We have a current and up to date cached version
                     return cachedCalendar.CalendarModel;
+                calendarModel = cachedCalendar.CalendarModel;
             }
 
-            CalendarModel calendarModel;
+            if (calendarModel == null)
+                calendarModel = new CalendarModel
+                {
+                    Owner = id,
+                    LastChangeDate = DateTime.UtcNow,
+                };
+
             switch (credentials.Type)
             {
                 case "EWS":
@@ -60,43 +69,38 @@ namespace SystemOut.CalandarApi.Controllers
                     var week = ewsService.FindAppointments(WellKnownFolderName.Calendar,
                         new CalendarView(DateTime.Today, DateTime.Today.AddDays(days)));
 
-                    calendarModel = new CalendarModel
+                    calendarModel.Appointments = week.Select(a => new AppointmentModel
                     {
-                        Owner = id,
-                        Appointments = week.Select(a => new AppointmentModel
-                        {
-                            Subject = a.Subject,
-                            StartTime = a.Start.ToUniversalTime(),
-                            EndTime = a.End.ToUniversalTime(),
-                            Duration = a.Duration,
-                            IsPrivate =
-                                a.Sensitivity == Sensitivity.Private || a.Sensitivity == Sensitivity.Confidential
-                        })
-                    };
+                        Subject = a.Subject,
+                        StartTime = a.Start.ToUniversalTime(),
+                        EndTime = a.End.ToUniversalTime(),
+                        Duration = a.Duration,
+                        IsPrivate =
+                            a.Sensitivity == Sensitivity.Private || a.Sensitivity == Sensitivity.Confidential
+                    });
                     break;
                 case "ICS":
                     var icsCal = GetIcsCalendar(credentials.ServiceUrl);
-                    calendarModel = new CalendarModel
-                    {
-                        Owner = id,
-                        Appointments =
-                            icsCal.Where(
-                                a =>
-                                    a != null && a.StartDate.Date >= DateTime.UtcNow.Date &&
-                                    a.EndDate <= DateTime.UtcNow.Date.AddDays(days))
-                                .Select(e => new AppointmentModel
-                                {
-                                    Subject = e.Summary,
-                                    StartTime = e.StartDate,
-                                    EndTime = e.EndDate,
-                                })
-                    };
+                    calendarModel.Appointments =
+                        icsCal.Where(a => a != null)
+                            .Select(e => new AppointmentModel
+                            {
+                                Subject = e.Summary,
+                                StartTime = e.StartDate,
+                                EndTime = e.EndDate,
+                            });
                     break;
                 default:
                     throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.BadRequest, ""));
             }
 
-            calendarCache.PutCalendar(calendarModel);
+            var cachedEntry = calendarCache.PutCalendar(id, calendarModel);
+            calendarModel.LastChangeDate = cachedEntry.CalendarModel.LastChangeDate;
+            // Now only return the appointments in the requested range
+            calendarModel.Appointments = calendarModel.Appointments
+                .Where(a => a != null &&
+                            a.StartTime.Date >= DateTime.UtcNow.Date &&
+                            a.EndTime <= DateTime.UtcNow.Date.AddDays(days));
 
             return calendarModel;
         }
@@ -155,7 +159,7 @@ namespace SystemOut.CalandarApi.Controllers
         private IEnumerable<VEvent> GetIcsCalendar(string url)
         {
             var allLines = icsService.GetIcsContent(url);
-            var events = new List<VEvent>();
+            var events = new ConcurrentBag<VEvent>();
             Parallel.For(0, allLines.Length, x =>
             {
                 if (allLines[x] == "BEGIN:VEVENT")
