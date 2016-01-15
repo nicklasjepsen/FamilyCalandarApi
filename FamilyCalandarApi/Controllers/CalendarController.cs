@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -19,6 +20,7 @@ namespace SystemOut.CalandarApi.Controllers
         private readonly ICredentialProvider credentialProvider;
         private readonly IIcsService icsService;
         private readonly ICalendarCache calendarCache;
+        private readonly IIcsContentCache icsContentCache;
 
         //public CalendarController()
         //{
@@ -27,11 +29,12 @@ namespace SystemOut.CalandarApi.Controllers
         //    calendarCache = new CalendarCache();
         //}
 
-        public CalendarController(ICredentialProvider credentialProvider, IIcsService icsService, ICalendarCache calendarCache)
+        public CalendarController(ICredentialProvider credentialProvider, IIcsService icsService, ICalendarCache calendarCache, IIcsContentCache icsContentCache)
         {
             this.credentialProvider = credentialProvider;
             this.icsService = icsService;
             this.calendarCache = calendarCache;
+            this.icsContentCache = new IcsContentCache();
         }
 
         [HttpGet]
@@ -80,9 +83,10 @@ namespace SystemOut.CalandarApi.Controllers
                     });
                     break;
                 case "ICS":
-                    var icsCal = GetIcsCalendar(credentials.ServiceUrl);
+                    var icsCal = GetIcsCalendar(id, credentials.ServiceUrl);
+                    calendarModel.LastChangeDate = cachedEntry.CalendarModel.LastChangeDate;
                     calendarModel.Appointments =
-                        icsCal.Where(a => a != null)
+                        icsCal.Values.Where(a => a != null)
                             .Select(e => new AppointmentModel
                             {
                                 Subject = e.Summary,
@@ -155,11 +159,26 @@ namespace SystemOut.CalandarApi.Controllers
         //    }
         //}
 
+        class GetIcsCalendarDto
+        {
+            public ConcurrentDictionary<string, VEvent> Events { get; set; }
+            public bool ReadFromCache { get; set; }
+        }
 
-        private IEnumerable<VEvent> GetIcsCalendar(string url)
+        private GetIcsCalendarDto GetIcsCalendar(string id, string url)
         {
             var allLines = icsService.GetIcsContent(url);
-            var events = new ConcurrentBag<VEvent>();
+
+            if (icsContentCache.ValidateCacheContent(id, allLines))
+            {
+                return new GetIcsCalendarDto
+                {
+                    Events = icsContentCache.GetCachedContent(id),
+                    ReadFromCache = true
+                };
+            }
+
+            var events = new ConcurrentDictionary<string, VEvent>();
             Parallel.For(0, allLines.Length, x =>
             {
                 if (allLines[x] == "BEGIN:VEVENT")
@@ -224,11 +243,20 @@ namespace SystemOut.CalandarApi.Controllers
                     {
                         vevent.Uid = uid;
                     }
-                    events.Add(vevent);
+                    if (!events.TryAdd(vevent.Uid, vevent))
+                    {
+                        Debug.WriteLine($"Unable to write event with uid {vevent.Uid} to dictionary.");
+                    }
                 }
             });
 
-            return events;
+            icsContentCache.Put(id, allLines, events);
+
+            return new GetIcsCalendarDto
+            {
+                Events = events,
+                ReadFromCache = false
+            };
         }
 
         class DateTimeParseResult
@@ -262,7 +290,7 @@ namespace SystemOut.CalandarApi.Controllers
             return new DateTimeParseResult(key, value);
         }
 
-        class VEvent
+        public class VEvent
         {
             public DateTime Created { get; set; }
             public DateTime EndDate { get; set; }

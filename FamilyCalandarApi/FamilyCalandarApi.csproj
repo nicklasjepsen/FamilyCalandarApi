@@ -167,6 +167,7 @@
     </Compile>
     <Compile Include="ICredentialProvider.cs" />
     <Compile Include="IcsService.cs" />
+    <Compile Include="IIcsContentCache.cs" />
     <Compile Include="IIcsService.cs" />
     <Compile Include="Models\AppointmentModel.cs" />
     <Compile Include="Models\CalendarModel.cs" />
