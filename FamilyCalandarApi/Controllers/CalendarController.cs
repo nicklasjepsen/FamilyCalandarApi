@@ -17,27 +17,38 @@ namespace SystemOut.CalandarApi.Controllers
     {
         private readonly ICredentialProvider credentialProvider;
         private readonly IIcsService icsService;
+        private readonly ICalendarCache calendarCache;
 
         public CalendarController()
         {
             credentialProvider = new CredentialProvider();
             icsService = new IcsService();
+            calendarCache = new CalendarCache();
         }
 
-        public CalendarController(ICredentialProvider credentialProvider, IIcsService icsService)
+        public CalendarController(ICredentialProvider credentialProvider, IIcsService icsService, ICalendarCache calendarCache)
         {
             this.credentialProvider = credentialProvider;
             this.icsService = icsService;
+            this.calendarCache = calendarCache;
         }
 
         [HttpGet]
-        public CalendarModel Get(string id, int days)
+        public CalendarModel Get(string id, Guid watermark, int days)
         {
             var credentials = credentialProvider.GetCredentials(id);
             if (credentials == null)
                 throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.NotFound, ""));
 
+            var cachedCalendar = calendarCache.GetCalendar(watermark);
+            if (cachedCalendar != null)
+            {
+                if (!cachedCalendar.IsExpired)
+                    // We have a current and up to date cached version
+                    return cachedCalendar.CalendarModel;
+            }
 
+            CalendarModel calendarModel;
             switch (credentials.Type)
             {
                 case "EWS":
@@ -49,7 +60,7 @@ namespace SystemOut.CalandarApi.Controllers
                     var week = ewsService.FindAppointments(WellKnownFolderName.Calendar,
                         new CalendarView(DateTime.Today, DateTime.Today.AddDays(days)));
 
-                    return new CalendarModel
+                    calendarModel = new CalendarModel
                     {
                         Owner = id,
                         Appointments = week.Select(a => new AppointmentModel
@@ -62,9 +73,10 @@ namespace SystemOut.CalandarApi.Controllers
                                 a.Sensitivity == Sensitivity.Private || a.Sensitivity == Sensitivity.Confidential
                         })
                     };
+                    break;
                 case "ICS":
                     var icsCal = GetIcsCalendar(credentials.ServiceUrl);
-                    return new CalendarModel
+                    calendarModel = new CalendarModel
                     {
                         Owner = id,
                         Appointments =
@@ -79,9 +91,14 @@ namespace SystemOut.CalandarApi.Controllers
                                     EndTime = e.EndDate,
                                 })
                     };
+                    break;
                 default:
                     throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.BadRequest, ""));
             }
+
+            calendarCache.PutCalendar(calendarModel);
+
+            return calendarModel;
         }
 
 
@@ -171,15 +188,15 @@ namespace SystemOut.CalandarApi.Controllers
                     string created, summary, startTime, endTime, sequence, uid;
                     if (props.TryGetValue("CREATED", out created))
                     {
-                    // 20141110T180231Z
-                    vevent.Created = DateTime.ParseExact(created, "yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture);
+                        // 20141110T180231Z
+                        vevent.Created = DateTime.ParseExact(created, "yyyyMMddTHHmmssZ", CultureInfo.InvariantCulture);
                     }
                     if (props.TryGetValue("SUMMARY", out summary))
                     {
                         vevent.Summary = summary;
                     }
-                // TODO: Handle timezone
-                if (props.TryGetValue("DTSTART_PARSED", out startTime))
+                    // TODO: Handle timezone
+                    if (props.TryGetValue("DTSTART_PARSED", out startTime))
                     {
                         vevent.StartDate = DateTime.ParseExact(startTime, "yyyyMMddTHHmmss", CultureInfo.InvariantCulture);
                     }
