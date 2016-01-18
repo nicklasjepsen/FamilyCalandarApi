@@ -34,35 +34,20 @@ namespace SystemOut.CalandarApi
 
         public CalendarCacheEntry PutCalendar(string id, CalendarCacheEntry calendarCacheModel)
         {
-            var internalCacheEntry = cache.AddOrUpdate(id, calendarCacheModel, (id1, entry) => calendarCacheModel);
-
-            return new CalendarCacheEntry(id, internalCacheEntry);
+            return cache.AddOrUpdate(id, calendarCacheModel, (id1, entry) => calendarCacheModel);
         }
     }
 
-    public class CalendarCacheEntry : BaseCalendarCacheEntry
+    public class CalendarCacheEntry
     {
         public string Id { get; set; }
+        public string ETag { get; set; }
+        public CalendarModel CalendarModel { get; set; }
 
         public CalendarCacheEntry(string id)
         {
             Id = id;
             CalendarModel = new CalendarModel();
         }
-
-        public CalendarCacheEntry(string id, BaseCalendarCacheEntry internalCalendarCacheEntry)
-        {
-            Id = id;
-            CalendarModel = internalCalendarCacheEntry.CalendarModel;
-            ExpirationTime = internalCalendarCacheEntry.ExpirationTime;
-        }
-    }
-
-    public class BaseCalendarCacheEntry
-    {
-        public string ETag { get; set; }
-        public CalendarModel CalendarModel { get; set; }
-        public DateTime ExpirationTime { get; set; }
-        public bool IsExpired => ExpirationTime <= DateTime.UtcNow;
     }
 }

@@ -10,9 +10,11 @@ namespace UnitTestProject
 {
     internal class IcsServiceMock : IIcsService
     {
+#pragma warning disable 1998
         public async Task<IcsCalendarModel> GetIcsContent(string path, string etag)
+#pragma warning restore 1998
         {
-            return new IcsCalendarModel {IcsLines = File.ReadAllLines("US-Holidays.ics")};
+            return new IcsCalendarModel {Appointments = IcsParser.ParseAppointments(File.ReadAllLines("US-Holidays.ics"))};
         }
     }
 }

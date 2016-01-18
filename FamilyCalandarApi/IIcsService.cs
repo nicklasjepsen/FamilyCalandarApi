@@ -13,7 +13,8 @@ namespace SystemOut.CalandarApi
 
     public class IcsCalendarModel
     {
-        public string[] IcsLines { get; set; }
+        public IEnumerable<AppointmentModel> Appointments { get; set; }
         public string ETag { get; set; }
+        public bool NotModified { get; set; }
     }
 }

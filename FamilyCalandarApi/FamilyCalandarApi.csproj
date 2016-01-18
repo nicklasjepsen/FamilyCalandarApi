@@ -166,6 +166,7 @@
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
     <Compile Include="ICredentialProvider.cs" />
+    <Compile Include="IcsParser.cs" />
     <Compile Include="IcsService.cs" />
     <Compile Include="IIcsService.cs" />
     <Compile Include="Models\AppointmentModel.cs" />
