@@ -19,13 +19,7 @@ namespace SystemOut.CalandarApi.Controllers
         private readonly ICredentialProvider credentialProvider;
         private readonly IIcsService icsService;
         private readonly ICalendarCache calendarCache;
-
-        //public CalendarController()
-        //{
-        //    credentialProvider = new CredentialProvider();
-        //    icsService = new IcsService();
-        //    calendarCache = new CalendarCache();
-        //}
+        
 
         public CalendarController(ICredentialProvider credentialProvider, IIcsService icsService, ICalendarCache calendarCache)
         {
@@ -35,28 +29,31 @@ namespace SystemOut.CalandarApi.Controllers
         }
 
         [HttpGet]
-        public CalendarModel Get(string id, int days)
+        public async Task<CalendarModel> Get(string id, int days)
         {
             var credentials = credentialProvider.GetCredentials(id);
             if (credentials == null)
                 throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.NotFound, ""));
 
             var cachedCalendar = calendarCache.GetCalendar(id);
-            CalendarModel calendarModel = null;
-            if (cachedCalendar != null)
+            CalendarModel calendarModel = new CalendarModel
             {
-                if (!cachedCalendar.IsExpired)
-                    // We have a current and up to date cached version
-                    return cachedCalendar.CalendarModel;
-                calendarModel = cachedCalendar.CalendarModel;
-            }
+                Owner = id,
+            };
+            //if (cachedCalendar != null)
+            //{
+            //    if (!cachedCalendar.IsExpired)
+            //        // We have a current and up to date cached version
+            //        return cachedCalendar.CalendarModel;
+            //    calendarModel = cachedCalendar.CalendarModel;
+            //}
 
-            if (calendarModel == null)
-                calendarModel = new CalendarModel
-                {
-                    Owner = id,
-                    LastChangeDate = DateTime.UtcNow,
-                };
+            //if (calendarModel == null)
+            //    calendarModel = new CalendarModel
+            //    {
+            //        Owner = id,
+            //        LastChangeDate = DateTime.UtcNow,
+            //    };
 
             switch (credentials.Type)
             {
@@ -80,7 +77,7 @@ namespace SystemOut.CalandarApi.Controllers
                     });
                     break;
                 case "ICS":
-                    var icsCal = GetIcsCalendar(credentials.ServiceUrl);
+                    var icsCal = await GetIcsCalendar(id, credentials.ServiceUrl);
                     calendarModel.Appointments =
                         icsCal.Where(a => a != null)
                             .Select(e => new AppointmentModel
@@ -94,8 +91,8 @@ namespace SystemOut.CalandarApi.Controllers
                     throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.BadRequest, ""));
             }
 
-            var cachedEntry = calendarCache.PutCalendar(id, calendarModel);
-            calendarModel.LastChangeDate = cachedEntry.CalendarModel.LastChangeDate;
+            //var cachedEntry = calendarCache.PutCalendar(id, calendarModel);
+            //calendarModel.LastChangeDate = cachedEntry.CalendarModel.LastChangeDate;
             // Now only return the appointments in the requested range
             calendarModel.Appointments = calendarModel.Appointments
                 .Where(a => a != null &&
@@ -154,21 +151,28 @@ namespace SystemOut.CalandarApi.Controllers
         //        throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.InternalServerError, e.Message));
         //    }
         //}
-
-
-        private IEnumerable<VEvent> GetIcsCalendar(string url)
+        
+        private async Task<IEnumerable<VEvent>> GetIcsCalendar(string id, string url)
         {
-            var allLines = icsService.GetIcsContent(url);
-            var events = new ConcurrentBag<VEvent>();
-            Parallel.For(0, allLines.Length, x =>
+
+            var cachedCalendarModel = calendarCache.GetCalendar(id);
+            if (cachedCalendarModel == null)
             {
-                if (allLines[x] == "BEGIN:VEVENT")
+                cachedCalendarModel = new CalendarCacheEntry(id);
+            }
+
+            var icsResponse = await icsService.GetIcsContent(url, cachedCalendarModel.ETag);
+            cachedCalendarModel.ETag = icsResponse.ETag;
+            var events = new ConcurrentBag<VEvent>();
+            Parallel.For(0, icsResponse.IcsLines.Length, x =>
+            {
+                if (icsResponse.IcsLines[x] == "BEGIN:VEVENT")
                 {
                     var y = x + 1;
                     var props = new Dictionary<string, string>();
                     do
                     {
-                        var line = allLines[y];
+                        var line = icsResponse.IcsLines[y];
                         y++;
                         if (!line.Contains(":"))
                             continue;
@@ -187,7 +191,7 @@ namespace SystemOut.CalandarApi.Controllers
                         {
                             props.Add(key, value);
                         }
-                    } while (allLines[y] != "END:VEVENT");
+                    } while (icsResponse.IcsLines[y] != "END:VEVENT");
                     var vevent = new VEvent();
                     string created, summary, startTime, endTime, sequence, uid;
                     if (props.TryGetValue("CREATED", out created))
@@ -227,6 +231,19 @@ namespace SystemOut.CalandarApi.Controllers
                     events.Add(vevent);
                 }
             });
+
+            calendarCache.PutCalendar(id, cachedCalendarModel);
+            //calendarCache.PutCalendar(id, new CalendarModel
+            //{
+            //    Appointments = events.Where(a => a != null)
+            //        .Select(e => new AppointmentModel
+            //        {
+            //            Subject = e.Summary,
+            //            StartTime = e.StartDate,
+            //            EndTime = e.EndDate,
+            //        }),
+            //    Owner = id,
+            //});
 
             return events;
         }

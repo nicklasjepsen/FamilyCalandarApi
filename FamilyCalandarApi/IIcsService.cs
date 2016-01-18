@@ -8,6 +8,12 @@ namespace SystemOut.CalandarApi
 {
     public interface IIcsService
     {
-        string[] GetIcsContent(string path);
+        Task<IcsCalendarModel> GetIcsContent(string path, string etag);
+    }
+
+    public class IcsCalendarModel
+    {
+        public string[] IcsLines { get; set; }
+        public string ETag { get; set; }
     }
 }

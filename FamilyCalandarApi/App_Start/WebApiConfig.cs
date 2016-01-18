@@ -9,7 +9,7 @@ namespace SystemOut.CalandarApi
         {
             // Web API configuration and services
             var container = new UnityContainer();
-            container.RegisterType<ICalendarCache, CalendarCache>(new ContainerControlledLifetimeManager());
+            container.RegisterInstance<ICalendarCache>(new CalendarCache(), new ContainerControlledLifetimeManager());
             container.RegisterType<ICredentialProvider, CredentialProvider>(new HierarchicalLifetimeManager());
             container.RegisterType<IIcsService, IcsService>(new HierarchicalLifetimeManager());
             config.DependencyResolver = new UnityResolver(container);

@@ -10,9 +10,9 @@ namespace UnitTestProject
 {
     internal class IcsServiceMock : IIcsService
     {
-        public string[] GetIcsContent(string path)
+        public async Task<IcsCalendarModel> GetIcsContent(string path, string etag)
         {
-            return File.ReadAllLines("US-Holidays.ics");
+            return new IcsCalendarModel {IcsLines = File.ReadAllLines("US-Holidays.ics")};
         }
     }
 }
