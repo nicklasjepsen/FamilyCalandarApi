@@ -150,6 +150,10 @@
     <Reference Include="System.Configuration" />
     <Reference Include="System.Web.Services" />
     <Reference Include="System.EnterpriseServices" />
+    <Reference Include="SystemOut.Toolbox.Core, Version=1.0.0.41293, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SystemOutToolbox.0.1.0.1\lib\SystemOut.Toolbox.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="Global.asax" />
@@ -202,12 +206,6 @@
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Service References\" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Submodules\SystemOutToolbox\SystemOut.Toolbox.Core\SystemOut.Toolbox.Core.csproj">
-      <Project>{2f3586e1-8d01-4608-adbf-7fdabae2c305}</Project>
-      <Name>SystemOut.Toolbox.Core</Name>
-    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
