@@ -8,10 +8,12 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
+using System.Web.Http.Cors;
 using Microsoft.Exchange.WebServices.Data;
 
 namespace SystemOut.CalandarApi.Controllers
 {
+    [EnableCors(origins: "*", headers: "*", methods: "*")]
     public class CalendarController : ApiController
     {
         private readonly ICredentialProvider credentialProvider;
@@ -103,6 +105,7 @@ namespace SystemOut.CalandarApi.Controllers
                     .Where(a => a != null &&
                                 a.StartTime.Date >= DateTime.UtcNow.Date &&
                                 a.EndTime <= DateTime.UtcNow.Date.AddDays(days))
+                    .OrderBy(a => a.StartTime)
             };
         }
 
