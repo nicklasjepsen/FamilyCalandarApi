@@ -35,14 +35,14 @@ namespace SystemOut.CalandarApi.Controllers
             return message;
         }
 
-        [HttpGet]
-        [Route("Calendar/{id}/{days}")]
-        public async Task<CalendarModel> Get(string id, int days)
+        private async Task<CalendarModel> InternalGetCalendar(string id, DateTime start, DateTime end)
         {
+            start = start.Date;
+            end = end.Date;
             var credentials = credentialProvider.GetCredentials(id);
             if (credentials == null)
                 throw new HttpResponseException(Request.CreateErrorResponse(HttpStatusCode.NotFound, ""));
-            
+
             var calendarModel = new CalendarModel
             {
                 Owner = id,
@@ -57,7 +57,7 @@ namespace SystemOut.CalandarApi.Controllers
                         Url = new Uri(credentials.ServiceUrl)
                     };
                     var week = ewsService.FindAppointments(WellKnownFolderName.Calendar,
-                        new CalendarView(DateTime.Today, DateTime.Today.AddDays(days)));
+                        new CalendarView(start, end.AddDays(1)));
 
                     calendarModel.Appointments = week.Select(a => new AppointmentModel
                     {
@@ -82,7 +82,7 @@ namespace SystemOut.CalandarApi.Controllers
                         {
                             calendarModel.Appointments = icsServiceResponse.Appointments;
                             calendarCache.PutCalendar(id,
-                                new CalendarCacheEntry(id) {CalendarModel = calendarModel, ETag = icsServiceResponse.ETag });
+                                new CalendarCacheEntry(id) { CalendarModel = calendarModel, ETag = icsServiceResponse.ETag });
                         }
                     }
                     else
@@ -90,7 +90,7 @@ namespace SystemOut.CalandarApi.Controllers
                         var icsResponse = await icsService.GetIcsContent(credentials.ServiceUrl, string.Empty);
                         calendarModel.Appointments = icsResponse.Appointments;
                         calendarCache.PutCalendar(id,
-                            new CalendarCacheEntry(id) { CalendarModel = calendarModel, ETag = icsResponse.ETag});
+                            new CalendarCacheEntry(id) { CalendarModel = calendarModel, ETag = icsResponse.ETag });
                     }
                     break;
                 default:
@@ -103,10 +103,43 @@ namespace SystemOut.CalandarApi.Controllers
                 Owner = calendarModel.Owner,
                 Appointments = calendarModel.Appointments
                     .Where(a => a != null &&
-                                a.StartTime.Date >= DateTime.UtcNow.Date &&
-                                a.EndTime <= DateTime.UtcNow.Date.AddDays(days))
+                                a.StartTime.Date >= start && a.StartTime.Date <= end)
                     .OrderBy(a => a.StartTime)
             };
+        }
+
+        [HttpGet]
+        [Route("Calendar/{id}/Day/{date}")]
+        public async Task<CalendarModel> GetDay(string id, string date)
+        {
+            // 2016-09-14
+            var parsed = new DateTime(int.Parse(date.Substring(0, 4)), int.Parse(date.Substring(5, 2)), int.Parse(date.Substring(8, 2)));
+            return await InternalGetCalendar(id, parsed, parsed);
+        }
+
+        [HttpGet]
+        [Route("Calendar/Day/{date}")]
+        public async Task<List<AppointmentModel>> GetMultipleDay([FromUri]string[] ids, string date)
+        {
+            // 2016-09-14
+            var parsed = new DateTime(int.Parse(date.Substring(0, 4)), int.Parse(date.Substring(5, 2)), int.Parse(date.Substring(8, 2)));
+
+            var results = new List<AppointmentModel>();
+
+            foreach (var id in ids)
+            {
+                var apps = await InternalGetCalendar(id, parsed, parsed);
+                results.AddRange(apps.Appointments);
+            }
+
+            return results.OrderBy(a => a.StartTime).ToList();
+        }
+
+        [HttpGet]
+        [Route("Calendar/{id}/{days}")]
+        public async Task<CalendarModel> Get(string id, int days)
+        {
+            return await InternalGetCalendar(id, DateTime.Now, DateTime.UtcNow.AddDays(days));
         }
 
         // OData support follows
