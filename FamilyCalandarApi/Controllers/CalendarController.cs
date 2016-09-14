@@ -27,6 +27,14 @@ namespace SystemOut.CalandarApi.Controllers
         }
 
         [HttpGet]
+        [Route("Ping/{message}")]
+        public string Ping(string message)
+        {
+            return message;
+        }
+
+        [HttpGet]
+        [Route("Calendar/{id}/{days}")]
         public async Task<CalendarModel> Get(string id, int days)
         {
             var credentials = credentialProvider.GetCredentials(id);
